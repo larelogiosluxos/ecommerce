@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../Firebase'; //
+import { db, auth } from '../../Firebase'; // Certifique-se de que o auth está exportado no Firebase.ts
 import { 
   collection, addDoc, getDocs, doc, deleteDoc, updateDoc, query, orderBy 
 } from 'firebase/firestore';
+import { signOut } from 'firebase/auth'; // Importação para o Logout
+import { useNavigate } from 'react-router-dom'; // Para redirecionar após sair
 import { 
   Container, Typography, TextField, Button, Box, Paper, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  IconButton, Snackbar, Alert, Switch, FormControlLabel, Collapse
+  IconButton, Snackbar, Alert, Switch, FormControlLabel, Collapse, MenuItem
 } from '@mui/material';
-import Grid from '@mui/material/Grid'; // Usando Grid2 para evitar erros de tipagem
+import Grid from '@mui/material/Grid'; 
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -16,6 +18,7 @@ import CancelIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 interface Watch {
   id: string;
@@ -25,27 +28,38 @@ interface Watch {
   imageUrl: string;
   description: string;
   featured: boolean;
+  category: string;
 }
 
-const AdminDashboard = () => {
-  // Controle de visibilidade do formulário
-  const [showForm, setShowForm] = useState(false);
+const categories = ["Masculino", "Feminino", "Luxo", "Esportivo"];
 
-  // Estados para Cadastro
+const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [featured, setFeatured] = useState(false);
+  const [category, setCategory] = useState('Masculino');
 
-  // Estados para Gestão
   const [products, setProducts] = useState<Watch[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Watch>>({});
   
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  // Função de Logout
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate('/portal-interno'); // Volta para a tela de login
+    } catch (err) {
+      showMsg("Erro ao sair do sistema.", "error");
+    }
+  };
 
   const fetchProducts = async () => {
     const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
@@ -65,9 +79,16 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       await addDoc(collection(db, "products"), {
-        name, brand, price: Number(price), description, imageUrl, featured, createdAt: new Date()
+        name, 
+        brand, 
+        price: Number(price), 
+        description, 
+        imageUrl, 
+        featured, 
+        category,
+        createdAt: new Date()
       });
-      setName(''); setBrand(''); setPrice(''); setDescription(''); setImageUrl(''); setFeatured(false);
+      setName(''); setBrand(''); setPrice(''); setDescription(''); setImageUrl(''); setFeatured(false); setCategory('Masculino');
       setShowForm(false);
       showMsg("Relógio publicado com sucesso!");
       fetchProducts();
@@ -105,21 +126,31 @@ const AdminDashboard = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
           Gestão de Estoque
         </Typography>
-        <Button 
-          variant="contained" 
-          startIcon={showForm ? <CancelIcon /> : <AddIcon />} 
-          color={showForm ? "error" : "primary"}
-          onClick={() => setShowForm(!showForm)}
-        >
-          {showForm ? "Cancelar" : "Cadastrar novo produto"}
-        </Button>
+        
+        <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button 
+                variant="outlined" 
+                color="error" 
+                startIcon={<LogoutIcon />}
+                onClick={handleLogout}
+            >
+                Sair
+            </Button>
+            <Button 
+                variant="contained" 
+                startIcon={showForm ? <CancelIcon /> : <AddIcon />} 
+                color={showForm ? "error" : "primary"}
+                onClick={() => setShowForm(!showForm)}
+            >
+                {showForm ? "Cancelar" : "Novo Produto"}
+            </Button>
+        </Box>
       </Box>
 
-      {/* Formulário Retrátil */}
       <Collapse in={showForm}>
         <Paper sx={{ p: 3, mb: 4, borderRadius: 2, border: '1px solid #e0e0e0' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Informações do Produto</Typography>
@@ -131,10 +162,23 @@ const AdminDashboard = () => {
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth label="Marca" variant="outlined" value={brand} onChange={e => setBrand(e.target.value)} required />
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Categoria"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  {categories.map((option) => (
+                    <MenuItem key={option} value={option}>{option}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth label="Preço (R$)" type="number" value={price} onChange={e => setPrice(e.target.value)} required />
               </Grid>
-              <Grid size={{ xs: 12, sm: 8 }}>
+              <Grid size={{ xs: 12 }}>
                 <TextField fullWidth label="URL da Imagem" value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
               </Grid>
               <Grid size={{ xs: 12 }}>
@@ -154,13 +198,13 @@ const AdminDashboard = () => {
         </Paper>
       </Collapse>
 
-      {/* Tabela de Produtos */}
       <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
         <Table>
           <TableHead sx={{ bgcolor: '#f5f5f5' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Destaque</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Produto</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Categoria</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Preço</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold' }}>Ações</TableCell>
             </TableRow>
@@ -185,9 +229,26 @@ const AdminDashboard = () => {
                 </TableCell>
                 <TableCell>
                   {editId === p.id ? (
+                    <TextField
+                      select
+                      size="small"
+                      fullWidth
+                      value={editFormData.category}
+                      onChange={e => setEditFormData({...editFormData, category: e.target.value})}
+                    >
+                      {categories.map((option) => (
+                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </TextField>
+                  ) : (
+                    p.category || 'Não definido'
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editId === p.id ? (
                     <TextField size="small" type="number" value={editFormData.price} onChange={e => setEditFormData({...editFormData, price: Number(e.target.value)})} />
                   ) : (
-                    `R$ ${p.price.toLocaleString('pt-BR')}`
+                    `R$ ${p.price?.toLocaleString('pt-BR')}`
                   )}
                 </TableCell>
                 <TableCell align="right">
