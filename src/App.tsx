@@ -10,6 +10,7 @@ import ProductList from './pages/client/ProductList';
 import LoginCliente from './pages/client/LoginCliente';
 import Register from './pages/client/Register';
 import CheckoutPagamento from './pages/client/CheckoutPagamento';
+import ProductDetail from './pages/client/ProductDetail';
 
 // Importação de Páginas (Admin)
 import Login from './pages/admin/Login';
@@ -95,6 +96,7 @@ function App() {
             path="/checkout-pagamento" 
             element={<CheckoutPagamento cartItems={cart} total={cartTotal} />} 
           />
+          <Route path="/produto/:id" element={<ProductDetail onAddToCart={addToCart} />} />
 
           {/* Rotas Administrativas */}
           <Route path="/portal-interno" element={<Login />} />

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { db } from '../../Firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { 
   Container, Card, CardMedia, CardContent, 
   Typography, Button, Box, CircularProgress, Divider, Tabs, Tab 
 } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid'; // Usando Grid2 para melhor compatibilidade
+import { useNavigate } from 'react-router-dom';
 
 interface Watch {
   id: string;
@@ -15,8 +16,10 @@ interface Watch {
   imageUrl: string;
   description: string;
   featured: boolean;
-  category: string; // Adicionado para suportar categorias
+  category: string;
 }
+
+const categories = ["Todos", "Masculino", "Feminino", "Luxo", "Esportivo"];
 
 const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
   const [allProducts, setAllProducts] = useState<Watch[]>([]);
@@ -25,9 +28,12 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
   const [selectedTab, setSelectedTab] = useState('Todos');
   const [loading, setLoading] = useState(true);
 
+  const navigate = useNavigate();
+
   const fetchData = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "products"));
+      const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
       const docs = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -47,7 +53,6 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
     fetchData();
   }, []);
 
-  // Lógica de Filtro por Categoria
   const handleTabChange = (_event: React.SyntheticEvent, newValue: string) => {
     setSelectedTab(newValue);
     if (newValue === 'Todos') {
@@ -59,48 +64,78 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}>
-        <CircularProgress />
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress color="primary" />
       </Box>
     );
   }
 
+  // Componente interno para o Card do Produto
   const ProductCard = ({ product }: { product: Watch }) => (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', borderRadius: 2 }}>
+    <Card sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      position: 'relative', 
+      borderRadius: 3,
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      '&:hover': {
+        transform: 'translateY(-5px)',
+        boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+      }
+    }}>
       {product.featured && (
         <Box sx={{ 
-          position: 'absolute', top: 10, left: 10, zIndex: 1,
-          bgcolor: '#fbc02d', color: '#000', px: 1, borderRadius: 1, 
-          fontWeight: 'bold', fontSize: '0.7rem' 
+          position: 'absolute', top: 12, left: 12, zIndex: 1,
+          bgcolor: '#B8860B', color: '#fff', px: 1.5, py: 0.5, borderRadius: 1, 
+          fontWeight: 'bold', fontSize: '0.65rem', boxShadow: 2
         }}>
           DESTAQUE
         </Box>
       )}
+      
       <CardMedia
         component="img"
         height="260"
-        image={product.imageUrl || 'https://via.placeholder.com/300x300?text=Relógio'}
+        image={product.imageUrl || 'https://via.placeholder.com/400x400?text=La+Relogios'}
         alt={product.name}
-        sx={{ objectFit: 'cover' }}
+        onClick={() => navigate(`/produto/${product.id}`)}
+        sx={{ cursor: 'pointer', objectFit: 'cover' }}
       />
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Typography variant="overline" color="text.secondary">{product.brand}</Typography>
-        <Typography variant="h6" component="h2" sx={{ fontWeight: 'bold', lineHeight: 1.2, mb: 1 }}>
+
+      <CardContent 
+        sx={{ flexGrow: 1, cursor: 'pointer' }}
+        onClick={() => navigate(`/produto/${product.id}`)}
+      >
+        <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+          {product.brand}
+        </Typography>
+        <Typography variant="h6" component="h2" sx={{ fontWeight: 'bold', lineHeight: 1.2, mb: 1, height: '2.8em', overflow: 'hidden' }}>
           {product.name}
         </Typography>
-        <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
+        <Typography variant="h6" sx={{ color: '#B8860B', fontWeight: 'bold' }}>
           R$ {product.price?.toLocaleString('pt-BR')}
         </Typography>
       </CardContent>
+
       <Box sx={{ p: 2, pt: 0 }}>
-            <Button 
-              fullWidth 
-              variant="contained" 
-              onClick={() => onAddToCart(product)} // <--- Adicione isso
-              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 'bold' }}
-            >
-              Adicionar ao Carrinho
-            </Button>
+        <Button 
+          fullWidth 
+          variant="contained" 
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToCart(product);
+          }}
+          sx={{ 
+            borderRadius: 2, 
+            textTransform: 'none', 
+            fontWeight: 'bold',
+            bgcolor: '#000',
+            '&:hover': { bgcolor: '#B8860B' }
+          }}
+        >
+          Adicionar ao Carrinho
+        </Button>
       </Box>
     </Card>
   );
@@ -108,44 +143,48 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
       
-      {/* SEÇÃO DE DESTAQUES (Só aparece na aba "Todos") */}
+      {/* SEÇÃO DE DESTAQUES */}
       {selectedTab === 'Todos' && featuredProducts.length > 0 && (
-        <Box sx={{ mb: 6 }}>
-          <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>⭐ Destaques</Typography>
-          <Grid container spacing={3}>
+        <Box sx={{ mb: 8 }}>
+          <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold', textAlign: 'center' }}>
+            Peças de Destaque
+          </Typography>
+          <Grid container spacing={4}>
             {featuredProducts.map((p) => (
-              /* RESOLUÇÃO DO ERRO: Usando size em vez de item/xs */
               <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <ProductCard product={p} />
               </Grid>
             ))}
           </Grid>
-          <Divider sx={{ mt: 6 }} />
+          <Divider sx={{ mt: 8 }} />
         </Box>
       )}
 
       {/* MENU DE CATEGORIAS */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
-        <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>Categorias</Typography>
+      <Box sx={{ mb: 6 }}>
+        <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>Nossa Coleção</Typography>
         <Tabs 
           value={selectedTab} 
           onChange={handleTabChange} 
           variant="scrollable"
           scrollButtons="auto"
-          sx={{ '& .MuiTab-root': { fontWeight: 'bold' } }}
+          textColor="primary"
+          indicatorColor="primary"
+          sx={{ 
+            borderBottom: 1, 
+            borderColor: 'divider',
+            '& .MuiTab-root': { fontWeight: 'bold', fontSize: '1rem', textTransform: 'none' }
+          }}
         >
-          <Tab label="Todos" value="Todos" />
-          <Tab label="Masculino" value="Masculino" />
-          <Tab label="Feminino" value="Feminino" />
-          <Tab label="Luxo" value="Luxo" />
-          <Tab label="Esportivo" value="Esportivo" />
+          {categories.map((cat) => (
+            <Tab key={cat} label={cat} value={cat} />
+          ))}
         </Tabs>
       </Box>
 
-      {/* LISTAGEM DE PRODUTOS FILTRADOS */}
+      {/* LISTAGEM PRINCIPAL */}
       <Grid container spacing={3}>
         {filteredProducts.map((p) => (
-          /* RESOLUÇÃO DO ERRO: Usando size em vez de item/xs */
           <Grid key={p.id} size={{ xs: 12, sm: 6, md: 3 }}>
             <ProductCard product={p} />
           </Grid>
@@ -155,7 +194,7 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
       {filteredProducts.length === 0 && (
         <Box sx={{ textAlign: 'center', mt: 10 }}>
           <Typography variant="h6" color="text.secondary">
-            Nenhum relógio disponível nesta categoria no momento.
+            Nenhum relógio encontrado nesta categoria.
           </Typography>
         </Box>
       )}

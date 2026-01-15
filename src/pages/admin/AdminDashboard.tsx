@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { db, auth } from '../../Firebase'; // Certifique-se de que o auth está exportado no Firebase.ts
+import { db, auth } from '../../Firebase'; 
 import { 
   collection, addDoc, getDocs, doc, deleteDoc, updateDoc, query, orderBy 
 } from 'firebase/firestore';
-import { signOut } from 'firebase/auth'; // Importação para o Logout
-import { useNavigate } from 'react-router-dom'; // Para redirecionar após sair
+import { signOut } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 import { 
   Container, Typography, TextField, Button, Box, Paper, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  IconButton, Snackbar, Alert, Switch, FormControlLabel, Collapse, MenuItem
+  IconButton, Snackbar, Alert, Switch, FormControlLabel, Collapse, MenuItem, LinearProgress, Avatar
 } from '@mui/material';
 import Grid from '@mui/material/Grid'; 
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -19,6 +19,7 @@ import AddIcon from '@mui/icons-material/Add';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import LogoutIcon from '@mui/icons-material/Logout';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 interface Watch {
   id: string;
@@ -43,6 +44,7 @@ const AdminDashboard = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [featured, setFeatured] = useState(false);
   const [category, setCategory] = useState('Masculino');
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [products, setProducts] = useState<Watch[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
@@ -51,13 +53,46 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  // Função de Logout
+  // --- NOVA FUNÇÃO DE UPLOAD (CLOUDINARY) ---
+  const handleUploadImage = async (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadProgress(20); 
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    // CONFIGURAÇÃO IMPORTANTE:
+    formData.append('upload_preset', 'ecommerce '); // <--- COLOQUE SEU PRESET AQUI
+    
+    try {
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/dywsf0que/image/upload`, // <--- COLOQUE SEU CLOUD NAME AQUI
+        { method: 'POST', body: formData }
+      );
+
+      const data = await response.json();
+
+      if (data.secure_url) {
+        setImageUrl(data.secure_url);
+        showMsg("Imagem carregada com sucesso!");
+        setUploadProgress(0);
+      } else {
+        throw new Error("Erro no upload");
+      }
+    } catch (error) {
+      console.error("Erro no upload:", error);
+      showMsg("Erro ao subir imagem. Verifique as chaves.", "error");
+      setUploadProgress(0);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      navigate('/portal-interno'); // Volta para a tela de login
+      navigate('/portal-interno');
     } catch (err) {
-      showMsg("Erro ao sair do sistema.", "error");
+      showMsg("Erro ao sair.", "error");
     }
   };
 
@@ -76,21 +111,17 @@ const AdminDashboard = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!imageUrl) return alert("Por favor, faça o upload da imagem primeiro.");
+    
     setLoading(true);
     try {
       await addDoc(collection(db, "products"), {
-        name, 
-        brand, 
-        price: Number(price), 
-        description, 
-        imageUrl, 
-        featured, 
-        category,
+        name, brand, price: Number(price), description, imageUrl, featured, category,
         createdAt: new Date()
       });
-      setName(''); setBrand(''); setPrice(''); setDescription(''); setImageUrl(''); setFeatured(false); setCategory('Masculino');
+      setName(''); setBrand(''); setPrice(''); setDescription(''); setImageUrl(''); setFeatured(false);
       setShowForm(false);
-      showMsg("Relógio publicado com sucesso!");
+      showMsg("Relógio publicado!");
       fetchProducts();
     } catch (err) { showMsg("Erro ao publicar.", "error"); }
     setLoading(false);
@@ -127,25 +158,10 @@ const AdminDashboard = () => {
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-          Gestão de Estoque
-        </Typography>
-        
+        <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }}>Gestão de Estoque</Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button 
-                variant="outlined" 
-                color="error" 
-                startIcon={<LogoutIcon />}
-                onClick={handleLogout}
-            >
-                Sair
-            </Button>
-            <Button 
-                variant="contained" 
-                startIcon={showForm ? <CancelIcon /> : <AddIcon />} 
-                color={showForm ? "error" : "primary"}
-                onClick={() => setShowForm(!showForm)}
-            >
+            <Button variant="outlined" color="error" startIcon={<LogoutIcon />} onClick={handleLogout}>Sair</Button>
+            <Button variant="contained" startIcon={showForm ? <CancelIcon /> : <AddIcon />} color={showForm ? "error" : "primary"} onClick={() => setShowForm(!showForm)}>
                 {showForm ? "Cancelar" : "Novo Produto"}
             </Button>
         </Box>
@@ -162,43 +178,50 @@ const AdminDashboard = () => {
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth label="Marca" variant="outlined" value={brand} onChange={e => setBrand(e.target.value)} required />
               </Grid>
+              
+              <Grid size={{ xs: 12 }}>
+                <Box sx={{ border: '2px dashed #ccc', p: 3, textAlign: 'center', borderRadius: 2, bgcolor: '#fafafa' }}>
+                  {imageUrl ? (
+                    <Box sx={{ mb: 2 }}>
+                      <img src={imageUrl} alt="Preview" style={{ width: 150, height: 150, objectFit: 'cover', borderRadius: 8 }} />
+                      <Typography variant="caption" display="block" color="success.main">Imagem vinculada!</Typography>
+                    </Box>
+                  ) : (
+                    <CloudUploadIcon sx={{ fontSize: 40, color: '#ccc', mb: 1 }} />
+                  )}
+                  
+                  <Button variant="outlined" component="label" disabled={uploadProgress > 0}>
+                    {uploadProgress > 0 ? `Processando...` : "Selecionar Foto do Relógio"}
+                    <input type="file" hidden accept="image/*" onChange={handleUploadImage} />
+                  </Button>
+                  
+                  {uploadProgress > 0 && <LinearProgress variant="indeterminate" sx={{ mt: 2 }} />}
+                </Box>
+              </Grid>
+
               <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Categoria"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                >
-                  {categories.map((option) => (
-                    <MenuItem key={option} value={option}>{option}</MenuItem>
-                  ))}
+                <TextField select fullWidth label="Categoria" value={category} onChange={(e) => setCategory(e.target.value)}>
+                  {categories.map((option) => (<MenuItem key={option} value={option}>{option}</MenuItem>))}
                 </TextField>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth label="Preço (R$)" type="number" value={price} onChange={e => setPrice(e.target.value)} required />
               </Grid>
               <Grid size={{ xs: 12 }}>
-                <TextField fullWidth label="URL da Imagem" value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
-              </Grid>
-              <Grid size={{ xs: 12 }}>
                 <TextField fullWidth label="Descrição" multiline rows={2} value={description} onChange={e => setDescription(e.target.value)} />
               </Grid>
               <Grid size={{ xs: 12 }}>
-                <FormControlLabel
-                  control={<Switch checked={featured} onChange={(e) => setFeatured(e.target.checked)} />}
-                  label="Destacar este produto na página inicial"
-                />
+                <FormControlLabel control={<Switch checked={featured} onChange={(e) => setFeatured(e.target.checked)} />} label="Destacar na página inicial" />
               </Grid>
             </Grid>
-            <Button type="submit" variant="contained" size="large" sx={{ mt: 2 }} disabled={loading}>
+            <Button type="submit" variant="contained" size="large" sx={{ mt: 2 }} disabled={loading || uploadProgress > 0}>
               {loading ? 'Salvando...' : 'Confirmar Cadastro'}
             </Button>
           </Box>
         </Paper>
       </Collapse>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
+      <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
         <Table>
           <TableHead sx={{ bgcolor: '#f5f5f5' }}>
             <TableRow>
@@ -213,43 +236,32 @@ const AdminDashboard = () => {
             {products.map((p) => (
               <TableRow key={p.id} hover>
                 <TableCell>
-                  <IconButton onClick={() => toggleFeatured(p)}>
-                    {p.featured ? <StarIcon sx={{ color: '#fbc02d' }} /> : <StarBorderIcon />}
-                  </IconButton>
+                  <IconButton onClick={() => toggleFeatured(p)}>{p.featured ? <StarIcon sx={{ color: '#fbc02d' }} /> : <StarBorderIcon />}</IconButton>
                 </TableCell>
                 <TableCell>
                   {editId === p.id ? (
                     <TextField size="small" value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})} />
                   ) : (
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: '500' }}>{p.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">{p.brand}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar src={p.imageUrl} variant="rounded" />
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{p.name}</Typography>
+                        <Typography variant="caption">{p.brand}</Typography>
+                      </Box>
                     </Box>
                   )}
                 </TableCell>
                 <TableCell>
                   {editId === p.id ? (
-                    <TextField
-                      select
-                      size="small"
-                      fullWidth
-                      value={editFormData.category}
-                      onChange={e => setEditFormData({...editFormData, category: e.target.value})}
-                    >
-                      {categories.map((option) => (
-                        <MenuItem key={option} value={option}>{option}</MenuItem>
-                      ))}
+                    <TextField select size="small" fullWidth value={editFormData.category} onChange={e => setEditFormData({...editFormData, category: e.target.value})}>
+                      {categories.map((option) => (<MenuItem key={option} value={option}>{option}</MenuItem>))}
                     </TextField>
-                  ) : (
-                    p.category || 'Não definido'
-                  )}
+                  ) : (p.category)}
                 </TableCell>
                 <TableCell>
                   {editId === p.id ? (
                     <TextField size="small" type="number" value={editFormData.price} onChange={e => setEditFormData({...editFormData, price: Number(e.target.value)})} />
-                  ) : (
-                    `R$ ${p.price?.toLocaleString('pt-BR')}`
-                  )}
+                  ) : (`R$ ${p.price?.toLocaleString('pt-BR')}`)}
                 </TableCell>
                 <TableCell align="right">
                   {editId === p.id ? (
