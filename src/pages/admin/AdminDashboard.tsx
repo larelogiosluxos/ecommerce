@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../../Firebase'; 
 import { 
-  collection, addDoc, getDocs, doc, deleteDoc, updateDoc, query, orderBy 
+  collection, addDoc, getDocs, doc, deleteDoc, updateDoc, query, orderBy, onSnapshot, serverTimestamp
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { 
   Container, Typography, TextField, Button, Box, Paper, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  IconButton, Snackbar, Alert, Switch, FormControlLabel, Collapse, MenuItem, LinearProgress, Avatar
+  IconButton, Snackbar, Alert, Switch, FormControlLabel, Collapse, MenuItem, LinearProgress, Avatar,
+  Tabs, Tab, List, ListItem, ListItemText, Badge, ListItemButton
 } from '@mui/material';
 import Grid from '@mui/material/Grid'; 
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -20,6 +21,8 @@ import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import LogoutIcon from '@mui/icons-material/Logout';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import ChatIcon from '@mui/icons-material/Chat';
+import SendIcon from '@mui/icons-material/Send';
 
 interface Watch {
   id: string;
@@ -36,6 +39,7 @@ const categories = ["Masculino", "Feminino", "Luxo", "Esportivo"];
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
@@ -49,6 +53,12 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState<Watch[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Watch>>({});
+  
+  // Estados do Chat
+  const [chats, setChats] = useState<any[]>([]);
+  const [selectedChat, setSelectedChat] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [adminMessage, setAdminMessage] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
@@ -105,6 +115,55 @@ const AdminDashboard = () => {
 
   useEffect(() => { fetchProducts(); }, []);
 
+  // Carrega chats em tempo real
+  useEffect(() => {
+    const chatsRef = collection(db, 'chats');
+    const q = query(chatsRef, orderBy('createdAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const chatsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setChats(chatsData);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Carrega mensagens do chat selecionado
+  useEffect(() => {
+    if (selectedChat) {
+      const messagesRef = collection(db, 'chats', selectedChat.id, 'messages');
+      const q = query(messagesRef, orderBy('timestamp', 'asc'));
+      
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const messages = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setChatMessages(messages);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [selectedChat]);
+
+  const sendAdminMessage = async () => {
+    if (adminMessage.trim() && selectedChat) {
+      try {
+        await addDoc(collection(db, 'chats', selectedChat.id, 'messages'), {
+          text: adminMessage,
+          sender: 'admin',
+          timestamp: serverTimestamp()
+        });
+        setAdminMessage('');
+      } catch (error) {
+        console.error('Erro ao enviar mensagem:', error);
+      }
+    }
+  };
+
   const showMsg = (msg: string, sev: 'success' | 'error' = 'success') => {
     setNotification({ open: true, message: msg, severity: sev });
   };
@@ -156,16 +215,54 @@ const AdminDashboard = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }}>Gestão de Estoque</Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant="outlined" color="error" startIcon={<LogoutIcon />} onClick={handleLogout}>Sair</Button>
-            <Button variant="contained" startIcon={showForm ? <CancelIcon /> : <AddIcon />} color={showForm ? "error" : "primary"} onClick={() => setShowForm(!showForm)}>
-                {showForm ? "Cancelar" : "Novo Produto"}
-            </Button>
-        </Box>
+    <Container maxWidth="lg" sx={{ mt: { xs: 2, md: 4 }, mb: 4 }}>
+      
+      {/* Tabs de navegação com botão de logout */}
+      <Box sx={{ 
+        borderBottom: 1, 
+        borderColor: 'divider', 
+        mb: 3,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 1
+      }}>
+        <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
+          <Tab label="Produtos" />
+          <Tab 
+            label={
+              <Badge badgeContent={chats.length} color="error">
+                Chat
+              </Badge>
+            } 
+            icon={<ChatIcon />} 
+            iconPosition="start"
+          />
+        </Tabs>
+        
+        <IconButton 
+          color="error" 
+          onClick={handleLogout}
+          sx={{ 
+            border: '1px solid',
+            borderColor: 'error.main',
+            '&:hover': { bgcolor: 'error.main', color: 'white' }
+          }}
+          title="Sair"
+        >
+          <LogoutIcon />
+        </IconButton>
       </Box>
+
+      {/* Painel de Produtos */}
+      {activeTab === 0 && (
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Button variant="contained" startIcon={showForm ? <CancelIcon /> : <AddIcon />} color={showForm ? "error" : "primary"} onClick={() => setShowForm(!showForm)}>
+              {showForm ? "Cancelar" : "Novo Produto"}
+            </Button>
+          </Box>
 
       <Collapse in={showForm}>
         <Paper sx={{ p: 3, mb: 4, borderRadius: 2, border: '1px solid #e0e0e0' }}>
@@ -281,6 +378,144 @@ const AdminDashboard = () => {
           </TableBody>
         </Table>
       </TableContainer>
+      </>
+      )}
+
+      {/* Painel de Chat */}
+      {activeTab === 1 && (
+        <Grid container spacing={2} sx={{ 
+          height: { xs: 'auto', md: '70vh' },
+          mb: { xs: 2, md: 0 }
+        }}>
+          {/* Lista de conversas */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper sx={{ height: { xs: '180px', md: '100%' }, overflow: 'auto' }}>
+              <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Conversas</Typography>
+              </Box>
+              <List>
+                {chats.length === 0 && (
+                  <ListItem>
+                    <ListItemText 
+                      primary="Nenhuma conversa" 
+                      secondary="Aguardando clientes..."
+                    />
+                  </ListItem>
+                )}
+                {chats.map((chat) => (
+                  <ListItemButton 
+                    key={chat.id}
+                    selected={selectedChat?.id === chat.id}
+                    onClick={() => setSelectedChat(chat)}
+                    sx={{
+                      borderBottom: '1px solid #eee',
+                      '&:hover': { bgcolor: '#f5f5f5' }
+                    }}
+                  >
+                    <Avatar sx={{ mr: 2, bgcolor: '#B8860B' }}>
+                      {chat.userName?.[0] || 'C'}
+                    </Avatar>
+                    <ListItemText
+                      primary={chat.userName || 'Cliente'}
+                      secondary={chat.userEmail || ''}
+                      primaryTypographyProps={{ fontWeight: 'bold' }}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Paper>
+          </Grid>
+
+          {/* Área de mensagens */}
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Paper sx={{ 
+              height: { xs: '500px', md: '100%' }, 
+              display: 'flex', 
+              flexDirection: 'column'
+            }}>
+              {selectedChat ? (
+                <>
+                  {/* Cabeçalho do chat */}
+                  <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {selectedChat.userName || 'Cliente'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {selectedChat.userEmail}
+                    </Typography>
+                  </Box>
+
+                  {/* Mensagens */}
+                  <Box sx={{ 
+                    flexGrow: 1, 
+                    overflowY: 'auto', 
+                    p: 2, 
+                    bgcolor: '#fafafa',
+                    height: { xs: '350px', md: 'auto' }
+                  }}>
+                    {chatMessages.map((msg, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          display: 'flex',
+                          justifyContent: msg.sender === 'admin' ? 'flex-end' : 'flex-start',
+                          mb: 2
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            maxWidth: '70%',
+                            bgcolor: msg.sender === 'admin' ? '#1976d2' : '#fff',
+                            color: msg.sender === 'admin' ? '#fff' : '#000',
+                            p: 1.5,
+                            borderRadius: 2,
+                            boxShadow: 1
+                          }}
+                        >
+                          <Typography variant="body2">{msg.text}</Typography>
+                          <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mt: 0.5 }}>
+                            {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : ''}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+
+                  {/* Campo de envio */}
+                  <Box sx={{ p: 2, borderTop: '1px solid #ddd', bgcolor: '#fff' }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <TextField
+                        fullWidth
+                        placeholder="Digite sua resposta..."
+                        value={adminMessage}
+                        onChange={(e) => setAdminMessage(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') sendAdminMessage();
+                        }}
+                        size="small"
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={sendAdminMessage}
+                        endIcon={<SendIcon />}
+                        disabled={!adminMessage.trim()}
+                      >
+                        Enviar
+                      </Button>
+                    </Box>
+                  </Box>
+                </>
+              ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                  <Typography variant="h6" color="text.secondary">
+                    Selecione uma conversa
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        </Grid>
+      )}
 
       <Snackbar open={notification.open} autoHideDuration={3000} onClose={() => setNotification({...notification, open: false})}>
         <Alert severity={notification.severity}>{notification.message}</Alert>

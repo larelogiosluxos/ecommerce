@@ -3,10 +3,10 @@ import { db } from '../../Firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { 
   Container, Card, CardMedia, CardContent, 
-  Typography, Button, Box, CircularProgress, Divider, Tabs, Tab 
+  Typography, Button, Box, CircularProgress, Divider
 } from '@mui/material';
-import Grid from '@mui/material/Grid'; // Usando Grid2 para melhor compatibilidade
-import { useNavigate } from 'react-router-dom';
+import Grid from '@mui/material/Grid';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 interface Watch {
   id: string;
@@ -19,16 +19,14 @@ interface Watch {
   category: string;
 }
 
-const categories = ["Todos", "Masculino", "Feminino", "Luxo", "Esportivo"];
-
 const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
   const [allProducts, setAllProducts] = useState<Watch[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Watch[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Watch[]>([]);
-  const [selectedTab, setSelectedTab] = useState('Todos');
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const fetchData = async () => {
     try {
@@ -40,8 +38,15 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
       })) as Watch[];
 
       setAllProducts(docs);
-      setFilteredProducts(docs);
       setFeaturedProducts(docs.filter(p => p.featured === true));
+      
+      // Verifica se há parâmetro de categoria na URL
+      const categoriaUrl = searchParams.get('categoria');
+      if (categoriaUrl) {
+        setFilteredProducts(docs.filter(p => p.category === categoriaUrl));
+      } else {
+        setFilteredProducts(docs);
+      }
     } catch (error) {
       console.error("Erro ao buscar produtos:", error);
     } finally {
@@ -53,14 +58,15 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
     fetchData();
   }, []);
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: string) => {
-    setSelectedTab(newValue);
-    if (newValue === 'Todos') {
-      setFilteredProducts(allProducts);
+  // Atualiza quando a URL muda
+  useEffect(() => {
+    const categoriaUrl = searchParams.get('categoria');
+    if (categoriaUrl) {
+      setFilteredProducts(allProducts.filter(p => p.category === categoriaUrl));
     } else {
-      setFilteredProducts(allProducts.filter(p => p.category === newValue));
+      setFilteredProducts(allProducts);
     }
-  };
+  }, [searchParams, allProducts]);
 
   if (loading) {
     return (
@@ -77,7 +83,7 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
       display: 'flex', 
       flexDirection: 'column', 
       position: 'relative', 
-      borderRadius: 3,
+      borderRadius: { xs: 2, md: 3 },
       transition: 'transform 0.2s, box-shadow 0.2s',
       '&:hover': {
         transform: 'translateY(-5px)',
@@ -86,9 +92,9 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
     }}>
       {product.featured && (
         <Box sx={{ 
-          position: 'absolute', top: 12, left: 12, zIndex: 1,
-          bgcolor: '#B8860B', color: '#fff', px: 1.5, py: 0.5, borderRadius: 1, 
-          fontWeight: 'bold', fontSize: '0.65rem', boxShadow: 2
+          position: 'absolute', top: { xs: 6, sm: 12 }, left: { xs: 6, sm: 12 }, zIndex: 1,
+          bgcolor: '#B8860B', color: '#fff', px: { xs: 1, sm: 1.5 }, py: 0.5, borderRadius: 1, 
+          fontWeight: 'bold', fontSize: { xs: '0.55rem', sm: '0.65rem' }, boxShadow: 2
         }}>
           DESTAQUE
         </Box>
@@ -96,29 +102,65 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
       
       <CardMedia
         component="img"
-        height="260"
+        height="auto"
         image={product.imageUrl || 'https://via.placeholder.com/400x400?text=La+Relogios'}
         alt={product.name}
         onClick={() => navigate(`/produto/${product.id}`)}
-        sx={{ cursor: 'pointer', objectFit: 'cover' }}
+        sx={{ 
+          cursor: 'pointer', 
+          objectFit: 'cover',
+          aspectRatio: '1',
+          maxHeight: { xs: '180px', sm: '220px', md: '260px' }
+        }}
       />
 
       <CardContent 
-        sx={{ flexGrow: 1, cursor: 'pointer' }}
+        sx={{ 
+          flexGrow: 1, 
+          cursor: 'pointer',
+          p: { xs: 1.5, sm: 2 },
+          '&:last-child': { pb: { xs: 1.5, sm: 2 } }
+        }}
         onClick={() => navigate(`/produto/${product.id}`)}
       >
-        <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+        <Typography 
+          variant="overline" 
+          color="text.secondary" 
+          sx={{ 
+            fontWeight: 'bold',
+            fontSize: { xs: '0.65rem', sm: '0.75rem' },
+            lineHeight: 1
+          }}
+        >
           {product.brand}
         </Typography>
-        <Typography variant="h6" component="h2" sx={{ fontWeight: 'bold', lineHeight: 1.2, mb: 1, height: '2.8em', overflow: 'hidden' }}>
+        <Typography 
+          variant="h6" 
+          component="h2" 
+          sx={{ 
+            fontWeight: 'bold', 
+            lineHeight: 1.2, 
+            mb: 1, 
+            height: { xs: '2.5em', sm: '2.8em' }, 
+            overflow: 'hidden',
+            fontSize: { xs: '0.95rem', sm: '1.1rem', md: '1.25rem' }
+          }}
+        >
           {product.name}
         </Typography>
-        <Typography variant="h6" sx={{ color: '#B8860B', fontWeight: 'bold' }}>
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            color: '#B8860B', 
+            fontWeight: 'bold',
+            fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' }
+          }}
+        >
           R$ {product.price?.toLocaleString('pt-BR')}
         </Typography>
       </CardContent>
 
-      <Box sx={{ p: 2, pt: 0 }}>
+      <Box sx={{ p: { xs: 1.5, sm: 2 }, pt: 0 }}>
         <Button 
           fullWidth 
           variant="contained" 
@@ -131,61 +173,66 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
             textTransform: 'none', 
             fontWeight: 'bold',
             bgcolor: '#000',
+            fontSize: { xs: '0.8rem', sm: '0.875rem', md: '1rem' },
+            py: { xs: 0.8, sm: 1 },
             '&:hover': { bgcolor: '#B8860B' }
           }}
         >
-          Adicionar ao Carrinho
+          Adicionar
         </Button>
       </Box>
     </Card>
   );
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
+    <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 3, md: 4 }, mb: { xs: 4, sm: 6, md: 8 }, px: { xs: 2, sm: 3 } }}>
       
       {/* SEÇÃO DE DESTAQUES */}
-      {selectedTab === 'Todos' && featuredProducts.length > 0 && (
-        <Box sx={{ mb: 8 }}>
-          <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold', textAlign: 'center' }}>
+      {!searchParams.get('categoria') && featuredProducts.length > 0 && (
+        <Box sx={{ mb: { xs: 4, sm: 6, md: 8 } }}>
+          <Typography 
+            variant="h4" 
+            sx={{ 
+              mb: { xs: 2, sm: 3, md: 4 }, 
+              fontWeight: 'bold', 
+              textAlign: 'center',
+              fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
+            }}
+          >
             Peças de Destaque
           </Typography>
-          <Grid container spacing={4}>
+          <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
             {featuredProducts.map((p) => (
-              <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Grid key={p.id} size={{ xs: 6, sm: 6, md: 4 }}>
                 <ProductCard product={p} />
               </Grid>
             ))}
           </Grid>
-          <Divider sx={{ mt: 8 }} />
+          <Divider sx={{ mt: { xs: 4, sm: 6, md: 8 } }} />
         </Box>
       )}
 
-      {/* MENU DE CATEGORIAS */}
-      <Box sx={{ mb: 6 }}>
-        <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>Nossa Coleção</Typography>
-        <Tabs 
-          value={selectedTab} 
-          onChange={handleTabChange} 
-          variant="scrollable"
-          scrollButtons="auto"
-          textColor="primary"
-          indicatorColor="primary"
-          sx={{ 
-            borderBottom: 1, 
-            borderColor: 'divider',
-            '& .MuiTab-root': { fontWeight: 'bold', fontSize: '1rem', textTransform: 'none' }
-          }}
-        >
-          {categories.map((cat) => (
-            <Tab key={cat} label={cat} value={cat} />
-          ))}
-        </Tabs>
-      </Box>
+      {/* TÍTULO DA SEÇÃO - Apenas quando houver categoria */}
+      {searchParams.get('categoria') && (
+        <Box sx={{ mb: { xs: 3, sm: 4, md: 6 } }}>
+          <Typography 
+            variant="h5" 
+            sx={{ 
+              mb: { xs: 2, sm: 2.5, md: 3 }, 
+              fontWeight: 'bold',
+              fontSize: { xs: '1.25rem', sm: '1.4rem', md: '1.5rem' },
+              textAlign: 'center'
+            }}
+          >
+            Categoria: {searchParams.get('categoria')}
+          </Typography>
+        </Box>
+      )}
 
       {/* LISTAGEM PRINCIPAL */}
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
         {filteredProducts.map((p) => (
-          <Grid key={p.id} size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid key={p.id} size={{ xs: 6, sm: 6, md: 3 }}>
             <ProductCard product={p} />
           </Grid>
         ))}

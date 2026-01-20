@@ -6,4 +6,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f5f5f5; /* Um cinza bem claro para destacar os cards brancos */
+  padding-bottom: env(safe-area-inset-bottom); /* Espaço para bottom navigation */
+}
+
+/* Adiciona padding bottom em telas mobile para o bottom navigation */
+@media (max-width: 899px) {
+  body {
+    padding-bottom: 60px;
+  }
 }
