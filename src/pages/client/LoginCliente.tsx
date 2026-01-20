@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { auth } from '../../Firebase';
+import { auth, db } from '../../Firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   Container, TextField, Button, Typography, Box, Paper, 
@@ -23,8 +24,22 @@ const LoginCliente = () => {
     setError('');
     
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      // Após o login, levamos o cliente de volta para a loja ou para o checkout
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const user = userCredential.user;
+      
+      // Verifica se o usuário é admin (não pode fazer login como cliente)
+      const adminDocRef = doc(db, 'admins', user.uid);
+      const adminDoc = await getDoc(adminDocRef);
+      
+      if (adminDoc.exists() && adminDoc.data()?.isAdmin === true) {
+        // Se for admin, faz logout e mostra erro
+        await auth.signOut();
+        setError("Esta é uma conta de administrador. Use o portal administrativo para acessar.");
+        setLoading(false);
+        return;
+      }
+      
+      // Se não for admin, permite o login e redireciona
       navigate('/'); 
     } catch (err: any) {
       setError("E-mail ou senha incorretos. Tente novamente.");

@@ -11,12 +11,14 @@ import CloseIcon from '@mui/icons-material/Close';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import MenuIcon from '@mui/icons-material/Menu';
 import LoginIcon from '@mui/icons-material/Login';
+import LogoutIcon from '@mui/icons-material/Logout';
 import SearchIcon from '@mui/icons-material/Search';
 import ChatIcon from '@mui/icons-material/Chat';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import HomeIcon from '@mui/icons-material/Home';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from '../Firebase';
+import { signOut } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDocs } from 'firebase/firestore';
 
 interface CartItem {
@@ -69,6 +71,20 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
   
   // Verifica se está na página do admin
   const isAdminPage = location.pathname.startsWith('/portal-interno') || location.pathname.startsWith('/admin-dashboard');
+  
+  // Verifica se deve mostrar o campo de busca (apenas na home)
+  const showSearchField = location.pathname === '/';
+
+  // Função de logout
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUserName(null);
+      navigate('/');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
 
   // Monitora o estado de autenticação e busca o nome do usuário no Firestore
   useEffect(() => {
@@ -187,13 +203,15 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
           <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', px: { xs: 0 }, minHeight: { xs: '56px', sm: '64px' } }}>
             
             {/* Menu Hamburger (Mobile) */}
-            <IconButton 
-              color="inherit" 
-              onClick={() => setIsMenuOpen(true)}
-              sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }}
-            >
-              <MenuIcon />
-            </IconButton>
+            {!isAdminPage && (
+              <IconButton 
+                color="inherit" 
+                onClick={() => setIsMenuOpen(true)}
+                sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }}
+              >
+                <MenuIcon />
+              </IconButton>
+            )}
 
             {/* LOGO / NOME DA LOJA */}
             <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit', flexGrow: { xs: 1, md: 0 } }}>
@@ -217,7 +235,7 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
             </Box>
 
             {/* CAMPO DE BUSCA */}
-            {!isAdminPage && (
+            {showSearchField && (
               <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', flexGrow: 1, maxWidth: 400, mx: 2 }}>
                 <TextField
                   fullWidth
@@ -247,20 +265,35 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
             )}
 
             {/* ÁREA DE USUÁRIO E CARRINHO */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 2 } }}>
+            {!isAdminPage && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 2 } }}>
               
               {userName ? (
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    fontWeight: '600', 
-                    color: '#B8860B',
-                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                    display: { xs: 'none', sm: 'block' }
-                  }}
-                >
-                  Olá, {userName}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: '600', 
+                      color: '#B8860B',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      display: { xs: 'none', sm: 'block' }
+                    }}
+                  >
+                    Olá, {userName}
+                  </Typography>
+                  <IconButton 
+                    onClick={handleLogout}
+                    size="small"
+                    sx={{ 
+                      display: { xs: 'none', sm: 'flex' },
+                      color: '#B8860B',
+                      '&:hover': { bgcolor: '#f5f5f5' }
+                    }}
+                    title="Sair"
+                  >
+                    <LogoutIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               ) : (
                 <Button 
                   component={Link} 
@@ -297,11 +330,12 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
                 </Badge>
               </IconButton>
             </Box>
+            )}
           </Toolbar>
         </Container>
         
         {/* CAMPO DE BUSCA MOBILE */}
-        {!isAdminPage && (
+        {showSearchField && (
           <Box sx={{ display: { xs: 'block', md: 'none' }, bgcolor: '#fff', px: 2, py: 1.5, borderTop: '1px solid #f0f0f0' }}>
             <TextField
               fullWidth
@@ -378,12 +412,21 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
             )}
             
             {userName && (
-              <ListItem>
-                <ListItemText 
-                  primary={`Olá, ${userName}`} 
-                  primaryTypographyProps={{ fontWeight: 'bold', color: '#B8860B' }}
-                />
-              </ListItem>
+              <>
+                <ListItem>
+                  <ListItemText 
+                    primary={`Olá, ${userName}`} 
+                    primaryTypographyProps={{ fontWeight: 'bold', color: '#B8860B' }}
+                  />
+                </ListItem>
+                <ListItemButton onClick={() => {
+                  handleLogout();
+                  setIsMenuOpen(false);
+                }}>
+                  <ListItemIcon><LogoutIcon /></ListItemIcon>
+                  <ListItemText primary="Sair" />
+                </ListItemButton>
+              </>
             )}
           </List>
         </Box>
@@ -651,18 +694,19 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
       </Dialog>
 
       {/* BOTTOM NAVIGATION (Mobile) */}
-      <Paper 
-        sx={{ 
-          position: 'fixed', 
-          bottom: 0, 
-          left: 0, 
-          right: 0, 
-          display: { xs: 'block', md: 'none' },
-          zIndex: 1100,
-          boxShadow: '0 -2px 10px rgba(0,0,0,0.1)'
-        }} 
-        elevation={3}
-      >
+      {!isAdminPage && (
+        <Paper 
+          sx={{ 
+            position: 'fixed', 
+            bottom: 0, 
+            left: 0, 
+            right: 0, 
+            display: { xs: 'block', md: 'none' },
+            zIndex: 1100,
+            boxShadow: '0 -2px 10px rgba(0,0,0,0.1)'
+          }} 
+          elevation={3}
+        >
         <BottomNavigation
           value={bottomNavValue}
           onChange={(_event, newValue) => {
@@ -699,6 +743,7 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
           />
         </BottomNavigation>
       </Paper>
+      )}
     </>
   );
 };

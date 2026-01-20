@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { auth } from '../../Firebase'; 
+import { auth, db } from '../../Firebase'; 
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { 
   Container, TextField, Button, Typography, Box, Paper, 
@@ -19,8 +20,20 @@ const Login = () => {
     e.preventDefault();
     try {
       // O .trim() remove espaços acidentais no início ou fim do e-mail
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      navigate('/admin-dashboard');
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const user = userCredential.user;
+      
+      // Verifica se o usuário é admin no Firestore
+      const adminDocRef = doc(db, 'admins', user.uid);
+      const adminDoc = await getDoc(adminDocRef);
+      
+      if (adminDoc.exists() && adminDoc.data()?.isAdmin === true) {
+        navigate('/admin-dashboard');
+      } else {
+        // Se não for admin, faz logout e mostra erro
+        await auth.signOut();
+        alert("Acesso negado. Você não tem permissões de administrador.");
+      }
     } catch (error) {
       alert("Credenciais de administrador incorretas.");
     }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../../Firebase'; 
 import { 
-  collection, addDoc, getDocs, doc, deleteDoc, updateDoc, query, orderBy, onSnapshot, serverTimestamp
+  collection, addDoc, getDocs, doc, deleteDoc, updateDoc, query, orderBy, onSnapshot, serverTimestamp, getDoc
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
@@ -62,6 +62,33 @@ const AdminDashboard = () => {
   
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  // Verifica se o usuário é admin ao carregar a página
+  useEffect(() => {
+    const checkAdminAccess = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        navigate('/portal-interno');
+        return;
+      }
+
+      try {
+        const adminDocRef = doc(db, 'admins', user.uid);
+        const adminDoc = await getDoc(adminDocRef);
+        
+        if (!adminDoc.exists() || adminDoc.data()?.isAdmin !== true) {
+          await signOut(auth);
+          alert('Acesso negado. Você não tem permissões de administrador.');
+          navigate('/portal-interno');
+        }
+      } catch (error) {
+        console.error('Erro ao verificar permissões:', error);
+        navigate('/portal-interno');
+      }
+    };
+
+    checkAdminAccess();
+  }, [navigate]);
 
   // --- NOVA FUNÇÃO DE UPLOAD (CLOUDINARY) ---
   const handleUploadImage = async (e: any) => {
