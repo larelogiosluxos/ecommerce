@@ -93,7 +93,15 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
 
   // Carrega ou cria chat quando o diálogo abre
   useEffect(() => {
-    if (contactOpen && auth.currentUser) {
+    if (contactOpen) {
+      // Verifica se o usuário está logado
+      if (!auth.currentUser) {
+        alert('Para usar o chat, você precisa fazer login ou se cadastrar primeiro.');
+        setContactOpen(false);
+        navigate('/login-cliente');
+        return;
+      }
+      
       const loadChat = async () => {
         try {
           const chatsRef = collection(db, 'chats');
@@ -155,7 +163,7 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
       
       loadChat();
     }
-  }, [contactOpen, auth.currentUser, userName]);
+  }, [contactOpen, navigate, userName]);
 
   // Cálculo do Total com segurança
   const total = (cartItems || []).reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -460,7 +468,7 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
         fullWidth
         maxWidth="sm"
         PaperProps={{
-          sx: { height: { xs: '100%', sm: '600px' }, maxHeight: '100%' }
+          sx: { height: { xs: '80vh', sm: '600px' }, maxHeight: { xs: '80vh', sm: '600px' } }
         }}
       >
         <DialogTitle>
