@@ -10,13 +10,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import MenuIcon from '@mui/icons-material/Menu';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LoginIcon from '@mui/icons-material/Login';
 import SearchIcon from '@mui/icons-material/Search';
 import ChatIcon from '@mui/icons-material/Chat';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import HomeIcon from '@mui/icons-material/Home';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from '../Firebase';
 import { doc, getDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDocs } from 'firebase/firestore';
 
@@ -58,7 +57,6 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [bottomNavValue, setBottomNavValue] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [contactOpen, setContactOpen] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(false);
@@ -67,6 +65,10 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Verifica se está na página do admin
+  const isAdminPage = location.pathname.startsWith('/portal-interno') || location.pathname.startsWith('/admin-dashboard');
 
   // Monitora o estado de autenticação e busca o nome do usuário no Firestore
   useEffect(() => {
@@ -212,10 +214,37 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
               <Button component={Link} to="/" sx={{ color: '#000', textTransform: 'none', fontWeight: 'bold' }}>
                 Início
               </Button>
-              <Button component={Link} to="/portal-interno" sx={{ color: '#888', textTransform: 'none', fontSize: '0.85rem' }}>
-                Admin
-              </Button>
             </Box>
+
+            {/* CAMPO DE BUSCA */}
+            {!isAdminPage && (
+              <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', flexGrow: 1, maxWidth: 400, mx: 2 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Buscar relógios..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && searchTerm.trim()) {
+                      navigate(`/?busca=${searchTerm}`);
+                      setSearchTerm('');
+                    }
+                  }}
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ mr: 1, color: '#888' }} />,
+                    sx: { borderRadius: 3, bgcolor: '#f5f5f5' }
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'transparent' },
+                      '&:hover fieldset': { borderColor: '#B8860B' },
+                      '&.Mui-focused fieldset': { borderColor: '#B8860B' }
+                    }
+                  }}
+                />
+              </Box>
+            )}
 
             {/* ÁREA DE USUÁRIO E CARRINHO */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 2 } }}>
@@ -270,6 +299,36 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
             </Box>
           </Toolbar>
         </Container>
+        
+        {/* CAMPO DE BUSCA MOBILE */}
+        {!isAdminPage && (
+          <Box sx={{ display: { xs: 'block', md: 'none' }, bgcolor: '#fff', px: 2, py: 1.5, borderTop: '1px solid #f0f0f0' }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Buscar relógios..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && searchTerm.trim()) {
+                  navigate(`/?busca=${searchTerm}`);
+                  setSearchTerm('');
+                }
+              }}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: '#888' }} />,
+                sx: { borderRadius: 3, bgcolor: '#f5f5f5' }
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': { borderColor: 'transparent' },
+                  '&:hover fieldset': { borderColor: '#B8860B' },
+                  '&.Mui-focused fieldset': { borderColor: '#B8860B' }
+                }
+              }}
+            />
+          </Box>
+        )}
       </AppBar>
 
       {/* MENU LATERAL - Categorias */}
@@ -326,13 +385,6 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
                 />
               </ListItem>
             )}
-            
-            <Divider sx={{ my: 1 }} />
-            
-            <ListItemButton component={Link} to="/portal-interno" onClick={() => setIsMenuOpen(false)}>
-              <ListItemIcon><AdminPanelSettingsIcon /></ListItemIcon>
-              <ListItemText primary="Admin" />
-            </ListItemButton>
           </List>
         </Box>
       </Drawer>
@@ -416,50 +468,6 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
           </Box>
         )}
       </Drawer>
-
-      {/* DIÁLOGO DE BUSCA */}
-      <Dialog 
-        open={searchOpen} 
-        onClose={() => setSearchOpen(false)}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            Buscar Produtos
-            <IconButton onClick={() => setSearchOpen(false)}><CloseIcon /></IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            placeholder="Digite o nome do relógio, marca..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ mt: 1 }}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: 'gray' }} />
-            }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setSearchOpen(false)}>Cancelar</Button>
-          <Button 
-            variant="contained" 
-            onClick={() => {
-              if (searchTerm.trim()) {
-                navigate(`/?busca=${searchTerm}`);
-                setSearchOpen(false);
-                setSearchTerm('');
-              }
-            }}
-            sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#B8860B' } }}
-          >
-            Buscar
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* DIÁLOGO DE FALE CONOSCO - CHAT */}
       <Dialog 
@@ -660,8 +668,7 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
           onChange={(_event, newValue) => {
             setBottomNavValue(newValue);
             if (newValue === 0) navigate('/');
-            if (newValue === 1) setSearchOpen(true);
-            if (newValue === 2) {
+            if (newValue === 1) {
               // Verifica se o usuário está logado antes de abrir o chat
               if (!auth.currentUser) {
                 alert('Para usar o chat, você precisa fazer login ou se cadastrar primeiro.');
@@ -670,7 +677,7 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
               }
               setContactOpen(true);
             }
-            if (newValue === 3) setTrackingOpen(true);
+            if (newValue === 2) setTrackingOpen(true);
           }}
           showLabels
           sx={{ height: 60 }}
@@ -678,11 +685,6 @@ const Navbar = ({ cartCount, cartItems, onRemoveItem }: NavbarProps) => {
           <BottomNavigationAction 
             label="Início" 
             icon={<HomeIcon />} 
-            sx={{ minWidth: 0, fontSize: '0.7rem' }}
-          />
-          <BottomNavigationAction 
-            label="Buscar" 
-            icon={<SearchIcon />} 
             sx={{ minWidth: 0, fontSize: '0.7rem' }}
           />
           <BottomNavigationAction 

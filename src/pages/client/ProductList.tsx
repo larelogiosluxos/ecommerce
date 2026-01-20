@@ -61,11 +61,27 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
   // Atualiza quando a URL muda
   useEffect(() => {
     const categoriaUrl = searchParams.get('categoria');
+    const buscaUrl = searchParams.get('busca');
+    
+    let produtosFiltrados = allProducts;
+    
+    // Filtro por categoria
     if (categoriaUrl) {
-      setFilteredProducts(allProducts.filter(p => p.category === categoriaUrl));
-    } else {
-      setFilteredProducts(allProducts);
+      produtosFiltrados = produtosFiltrados.filter(p => p.category === categoriaUrl);
     }
+    
+    // Filtro por busca (nome, marca ou descrição)
+    if (buscaUrl) {
+      const termoBusca = buscaUrl.toLowerCase().trim();
+      produtosFiltrados = produtosFiltrados.filter(p => 
+        p.name.toLowerCase().includes(termoBusca) ||
+        p.brand.toLowerCase().includes(termoBusca) ||
+        p.description?.toLowerCase().includes(termoBusca) ||
+        p.category?.toLowerCase().includes(termoBusca)
+      );
+    }
+    
+    setFilteredProducts(produtosFiltrados);
   }, [searchParams, allProducts]);
 
   if (loading) {
@@ -188,7 +204,7 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
     <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 3, md: 4 }, mb: { xs: 4, sm: 6, md: 8 }, px: { xs: 2, sm: 3 } }}>
       
       {/* SEÇÃO DE DESTAQUES */}
-      {!searchParams.get('categoria') && featuredProducts.length > 0 && (
+      {!searchParams.get('categoria') && !searchParams.get('busca') && featuredProducts.length > 0 && (
         <Box sx={{ mb: { xs: 4, sm: 6, md: 8 } }}>
           <Typography 
             variant="h4" 
@@ -229,6 +245,30 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
         </Box>
       )}
 
+      {/* TÍTULO DE BUSCA */}
+      {searchParams.get('busca') && (
+        <Box sx={{ mb: { xs: 3, sm: 4, md: 6 } }}>
+          <Typography 
+            variant="h5" 
+            sx={{ 
+              mb: { xs: 1, sm: 1.5, md: 2 }, 
+              fontWeight: 'bold',
+              fontSize: { xs: '1.25rem', sm: '1.4rem', md: '1.5rem' },
+              textAlign: 'center'
+            }}
+          >
+            Resultados para: "{searchParams.get('busca')}"
+          </Typography>
+          <Typography 
+            variant="body2" 
+            color="text.secondary"
+            sx={{ textAlign: 'center' }}
+          >
+            {filteredProducts.length} {filteredProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
+          </Typography>
+        </Box>
+      )}
+
       {/* LISTAGEM PRINCIPAL */}
       <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
         {filteredProducts.map((p) => (
@@ -240,9 +280,18 @@ const ProductList = ({ onAddToCart }: { onAddToCart: (p: any) => void }) => {
 
       {filteredProducts.length === 0 && (
         <Box sx={{ textAlign: 'center', mt: 10 }}>
-          <Typography variant="h6" color="text.secondary">
-            Nenhum relógio encontrado nesta categoria.
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+            {searchParams.get('busca') 
+              ? `Nenhum relógio encontrado para "${searchParams.get('busca')}"` 
+              : searchParams.get('categoria')
+              ? `Nenhum relógio encontrado nesta categoria.`
+              : 'Nenhum relógio disponível no momento.'}
           </Typography>
+          {searchParams.get('busca') && (
+            <Typography variant="body2" color="text.secondary">
+              Tente usar outras palavras-chave ou navegar pelas categorias.
+            </Typography>
+          )}
         </Box>
       )}
     </Container>
